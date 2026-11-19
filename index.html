@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0c0c0c">
+<title>Calculadora de amaestramiento | SBC Grupo Sebalcab</title>
+<meta name="description" content="Calcula los códigos de tallado y el montaje de pitones y pastillas de cualquier amaestramiento a partir del cilindro, la llave maestra y el plan de cierre.">
+<link rel="icon" type="image/png" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/icono-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/estilos.css">
+</head>
+<body>
+
+<div class="banda">
+  <header class="cabecera envoltura">
+    <a class="marca" href="https://sebalcab.es" rel="noopener">
+      <img src="img/logo-sbc.png" alt="SBC Grupo Sebalcab" width="104" height="53">
+    </a>
+    <div class="acciones-cabecera no-imprimir">
+      <button type="button" class="boton-fantasma" id="btn-guardar">Guardar plan</button>
+      <button type="button" class="boton-fantasma" id="btn-abrir">Abrir plan</button>
+      <input type="file" id="archivo-plan" accept=".html,.htm,.json,text/html,application/json" hidden>
+      <button type="button" class="boton-fantasma" id="btn-imprimir">Imprimir hoja de taller</button>
+    </div>
+  </header>
+
+  <section class="portada envoltura" aria-labelledby="titulo">
+    <div class="portada-texto">
+      <h1 id="titulo">Calculadora de <span class="oro">amaestramiento</span></h1>
+      <p class="entradilla">Sirve para cualquier marca de cilindro. Indica posiciones, alturas y pastillas, escribe la llave maestra y marca qué abre cada llave. La calculadora propone el código de tallado de cada llave, el montaje de pitones y pastillas de cada cilindro y comprueba que ninguna llave abre lo que no debe.</p>
+    </div>
+
+    <div class="tarjeta-maestra" role="group" aria-labelledby="maestra-titulo">
+      <div class="maestra-cabeza">
+        <h2 id="maestra-titulo">Llave maestra</h2>
+        <span class="maestra-codigo" id="maestra-codigo" aria-live="polite"></span>
+        <button type="button" class="boton-fantasma boton-reset no-imprimir" id="btn-reset-maestra">Borrar maestra</button>
+      </div>
+      <div class="maestra-entradas" id="maestra-entradas"></div>
+      <p class="maestra-pie"><span id="maestra-sistema"></span> <a href="#sistema" id="enlace-sistema">Cambiar cilindro</a></p>
+      <p class="maestra-pie">Puedes pegar el código entero, por ejemplo 1-6-1-4-5-2.</p>
+    </div>
+  </section>
+</div>
+
+<main class="envoltura principal">
+
+  <details class="bloque sistema no-imprimir" id="sistema" open>
+    <summary><h2>Cilindro y pastillas</h2><span class="sistema-resumen" id="sistema-resumen"></span></summary>
+    <div class="sistema-cuerpo" id="sistema-cuerpo"></div>
+  </details>
+
+  <section class="bloque no-imprimir" aria-labelledby="plan-titulo">
+    <div class="bloque-cabeza">
+      <h2 id="plan-titulo">Plan de cierre</h2>
+      <div class="bloque-acciones">
+        <button type="button" class="boton-sec" id="btn-ejemplo">Ver un ejemplo</button>
+        <button type="button" class="boton-sec" id="btn-vaciar">Empezar de cero</button>
+      </div>
+    </div>
+
+    <div class="campos campos-plan">
+      <div class="campo"><label for="plan-obra">Obra o cliente</label><input id="plan-obra" data-foco="plan-obra" data-plan="obra" type="text" autocomplete="off" placeholder="Por ejemplo, Nave polígono norte"></div>
+      <div class="campo"><label for="plan-referencia">Referencia o pedido</label><input id="plan-referencia" data-plan="referencia" type="text" autocomplete="off" placeholder="Opcional"></div>
+      <div class="campo campo-ancho"><label for="plan-notas">Notas para el documento</label><textarea id="plan-notas" data-plan="notas" rows="2" placeholder="Opcional: plazos, acabado, quién recoge las llaves…"></textarea></div>
+    </div>
+
+    <div class="rejilla-plan">
+      <div class="panel">
+        <h3>Cilindros</h3>
+        <div class="tabla-scroll">
+          <table class="tabla tabla-cilindros">
+            <thead><tr><th scope="col">Código</th><th scope="col">Puerta</th><th scope="col">Medida</th><th scope="col">Tipo</th><th scope="col"><span class="oculto">Quitar</span></th></tr></thead>
+            <tbody id="cuerpo-cilindros"></tbody>
+          </table>
+        </div>
+        <button type="button" class="boton-anadir" id="btn-anadir-cilindro">Añadir cilindro</button>
+      </div>
+
+      <div class="panel">
+        <h3>Llaves y accesos</h3>
+        <div class="tabla-scroll">
+          <table class="tabla tabla-accesos" id="tabla-accesos"></table>
+        </div>
+        <button type="button" class="boton-anadir" id="btn-anadir-llave">Añadir llave</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="barra-calculo no-imprimir">
+    <button type="button" class="boton-principal" id="btn-calcular">Calcular amaestramiento</button>
+    <button type="button" class="boton-sec" id="btn-otra">Otra propuesta</button>
+    <p class="mensaje-calculo" id="mensaje-calculo" role="status" aria-live="polite"></p>
+  </div>
+
+  <section class="bloque" aria-labelledby="resultado-titulo" id="resultado">
+    <div class="bloque-cabeza">
+      <h2 id="resultado-titulo">Resultado</h2>
+      <div class="resumen" id="resumen"></div>
+    </div>
+
+    <div class="pestanas no-imprimir" role="tablist" aria-label="Partes del resultado">
+      <button type="button" role="tab" id="tab-codigos" aria-controls="panel-codigos" aria-selected="true">Códigos de tallado</button>
+      <button type="button" role="tab" id="tab-montaje" aria-controls="panel-montaje" aria-selected="false" tabindex="-1">Montaje de cilindros</button>
+      <button type="button" role="tab" id="tab-comprobacion" aria-controls="panel-comprobacion" aria-selected="false" tabindex="-1">Comprobación</button>
+      <button type="button" role="tab" id="tab-material" aria-controls="panel-material" aria-selected="false" tabindex="-1">Material</button>
+    </div>
+
+    <div class="panel-res" role="tabpanel" id="panel-codigos" aria-labelledby="tab-codigos" tabindex="0"></div>
+    <div class="panel-res" role="tabpanel" id="panel-montaje" aria-labelledby="tab-montaje" tabindex="0" hidden></div>
+    <div class="panel-res" role="tabpanel" id="panel-comprobacion" aria-labelledby="tab-comprobacion" tabindex="0" hidden></div>
+    <div class="panel-res" role="tabpanel" id="panel-material" aria-labelledby="tab-material" tabindex="0" hidden></div>
+  </section>
+
+  <section class="bloque notas" aria-labelledby="notas-titulo">
+    <h2 id="notas-titulo">Cómo se calcula</h2>
+    <ul>
+      <li>Cada pastilla sube la pila un número fijo de alturas. Por ejemplo, si entre una altura y la siguiente hay 0,45 mm, una pastilla de 0,90 mm sube 2 alturas y una de 1,80 mm sube 4, hacia arriba o hacia abajo de la maestra.</li>
+      <li>En cada posición, una llave solo puede llevar alturas que se alcancen desde la maestra sumando pastillas. Con pastillas de 2 y 4 alturas, si la maestra lleva un 1, valen 1, 3 y 5; si lleva un 6, valen 6, 4 y 2.</li>
+      <li>En cada cámara se monta el pitón de la altura más baja de las llaves que abren ese cilindro y, encima, una pastilla por cada salto hasta la altura más alta.</li>
+      <li>La calculadora prueba muchas combinaciones y se queda con la que cumple el plan con menos pastillas. Cada llave se diferencia de la maestra y de las demás en al menos dos posiciones (se cambia en Cilindro y pastillas).</li>
+      <li>Es un cálculo teórico. Antes de entregar, prueba cada cilindro con todas las llaves del plan.</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="pie">
+  <div class="envoltura pie-dentro">
+    <img src="img/logo-sbc.png" alt="SBC Grupo Sebalcab" width="80" height="40" loading="lazy">
+    <p>Herramienta interna de SBC Grupo Sebalcab, distribuidor de cerrajería profesional. <a href="https://sebalcab.es" rel="noopener">sebalcab.es</a></p>
+  </div>
+</footer>
+
+<script src="assets/motor.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
