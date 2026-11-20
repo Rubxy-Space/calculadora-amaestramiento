@@ -447,3 +447,5 @@ button, input, select { font: inherit; color: inherit; }
   border: 1px solid var(--oro-linea); border-radius: 10px; background: var(--oro-palido); cursor: pointer; font-size: .9rem;
 }
 .opcion input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--oro); flex: 0 0 auto; }
+
+.consejo { padding: 10px 12px; border-radius: 8px; background: var(--oro-palido); color: var(--tinta); }

@@ -75,6 +75,9 @@
       minDifMaestra: sistema.minDifMaestra || 1,
       minDifLlaves: sistema.minDifLlaves || 1,
       antiRebaje: sistema.antiRebaje !== false,
+      // La pastilla más gruesa primero; las finas solo cuando no hay otra salida
+      preferirGruesa: sistema.preferirGruesa !== false,
+      saltoMax: Math.max.apply(null, sistema.pastillas.map(function (p) { return p.saltos || 0; }).concat([0])),
       // Profundidad relativa de una altura: cuanto mayor, más hondo el corte
       prof: alto ? function (v) { return v; } : function (v) { return H + 1 - v; }
     };
@@ -410,14 +413,17 @@
     var limiteNodos = opciones.nodos || 300;
     var tiempoMax = opciones.tiempoMs || 1500;
     var ramas = opciones.ramas || 3;
+    var penalFina = opciones.penalFina != null ? opciones.penalFina : 1.5;
     var azar = crearAzar(opciones.semilla || 1);
     var inicio = Date.now();
 
     var mejor = null;
+    var cacheCamaras = {};
 
     for (var intento = 0; intento < intentosMax; intento++) {
       if (Date.now() - inicio > tiempoMax) break;
-      var res = intentar();
+      // Intentos alternos: unos empujan hacia la pastilla gruesa y otros buscan con libertad
+      var res = intentar(ctx.preferirGruesa && intento % 2 === 0);
       if (res) {
         var codigos = res;
         var copia = {
@@ -428,11 +434,15 @@
         };
         var an = analizar(copia);
         if (!an.ok) continue;
-        var maxPila = 0;
+        var maxPila = 0, gruesas = 0, finas = 0;
         an.cilindros.forEach(function (c) {
-          (c.camaras || []).forEach(function (cam) { maxPila = Math.max(maxPila, cam.pila.length); });
+          (c.camaras || []).forEach(function (cam) {
+            maxPila = Math.max(maxPila, cam.pila.length);
+            cam.pila.forEach(function (pa) { if (pa.saltos === ctx.saltoMax) gruesas++; else finas++; });
+          });
         });
-        var puntuacion = an.totalPastillas * 100 + an.totalFantasmas * 2 + maxPila * 30;
+        // Cada pastilla fina cuesta como tres gruesas cuando se prefiere la gruesa
+        var puntuacion = gruesas * 100 + finas * (ctx.preferirGruesa ? 300 : 100) + an.totalFantasmas * 2 + maxPila * 30;
         if (!mejor || puntuacion < mejor.puntuacion) {
           mejor = { codigos: codigos, puntuacion: puntuacion, analisis: an };
         }
@@ -449,7 +459,7 @@
     return { ok: true, codigos: mejor.codigos, puntuacion: mejor.puntuacion, intentos: intento };
 
     /* Un intento: asignación voraz con vuelta atrás limitada. */
-    function intentar() {
+    function intentar(sesgoGruesa) {
       var codigo = {};
       fijas.forEach(function (l) { codigo[l.id] = l.codigo; });
 
@@ -460,10 +470,21 @@
 
       var puntos = {};
       function recalcular(cid) {
-        var conCodigo = autorizadasPor[cid].filter(function (l) { return codigo[l.id]; });
+        var lista = autorizadasPor[cid];
         var cams = [], error = false;
         for (var q = 0; q < ctx.P; q++) {
-          var cam = montarCamara(ctx, conCodigo.map(function (l) { return codigo[l.id][q]; }));
+          // La misma mezcla de alturas da siempre la misma pila: se guarda por máscara de bits
+          var mascara = 0;
+          for (var a = 0; a < lista.length; a++) {
+            var cod = codigo[lista[a].id];
+            if (cod) mascara |= 1 << cod[q];
+          }
+          var cam = cacheCamaras[mascara];
+          if (!cam) {
+            var valores = [];
+            for (var v = 1; v <= ctx.H; v++) if (mascara & (1 << v)) valores.push(v);
+            cam = cacheCamaras[mascara] = montarCamara(ctx, valores);
+          }
           if (cam.error) error = true;
           cams.push(cam.puntos);
         }
@@ -533,12 +554,21 @@
         if (i === orden.length) return true;
         if (nodos++ > limiteNodos) return false;
         var llave = orden[i];
-        // Coste: cortes nuevos que añade en los cilindros que abre
+        // Coste: cortes nuevos que añade en los cilindros que abre (más si obligan a una pastilla fina)
         var puntuados = candidatos.map(function (cod) {
           var coste = 0;
           for (var c = 0; c < llave.abre.length; c++) {
             var cams = puntos[llave.abre[c]];
-            for (var q = 0; q < ctx.P; q++) if (cams[q].indexOf(cod[q]) === -1) coste++;
+            for (var q = 0; q < ctx.P; q++) {
+              var pts = cams[q];
+              if (pts.indexOf(cod[q]) !== -1) continue;
+              coste++;
+              if (sesgoGruesa) {
+                var dmin = Infinity;
+                for (var z = 0; z < pts.length; z++) dmin = Math.min(dmin, Math.abs(pts[z] - cod[q]));
+                if (dmin < ctx.saltoMax) coste += penalFina;
+              }
+            }
           }
           return { cod: cod, coste: coste + azar() * 0.9 };
         });

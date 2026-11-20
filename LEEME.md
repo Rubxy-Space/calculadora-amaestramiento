@@ -5,6 +5,7 @@ Herramienta web de SBC Grupo Sebalcab para calcular amaestramientos de cilindros
 - Se configura el cilindro: posiciones, alturas, pastillas (cuántas alturas sube cada una) y, si se tienen, las profundidades de la ficha.
 - Se escribe la llave maestra y el plan de cierre: cilindros, llaves, copias y qué abre cada llave.
 - La calculadora propone el código de tallado de cada llave, el montaje de pitones y pastillas por cámara, comprueba que ninguna llave abre de más y saca el material necesario.
+- Reglas de Rubén: antirrebaje (cada llave con al menos un corte más hondo que la maestra y que las llaves que abren más) y pastilla gruesa primero (la fina solo cuando no hay otra salida).
 - «Guardar plan» descarga un documento HTML maquetado que se imprime o se guarda en PDF y que se vuelve a abrir con «Abrir plan».
 
 Archivos:

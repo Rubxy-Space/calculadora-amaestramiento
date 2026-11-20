@@ -27,7 +27,8 @@
         minDifMaestra: 2,
         minDifLlaves: 2,
         profundoAlto: true,
-        antiRebaje: true
+        antiRebaje: true,
+        preferirGruesa: true
       }
     },
     securemmeK1: {
@@ -43,7 +44,8 @@
         minDifMaestra: 2,
         minDifLlaves: 2,
         profundoAlto: true,
-        antiRebaje: true
+        antiRebaje: true,
+        preferirGruesa: true
       }
     }
   };
@@ -115,6 +117,7 @@
     if (!e.sistema.plantilla) e.sistema.plantilla = 'personalizado';
     if (typeof e.sistema.profundoAlto !== 'boolean') e.sistema.profundoAlto = true;
     if (typeof e.sistema.antiRebaje !== 'boolean') e.sistema.antiRebaje = true;
+    if (typeof e.sistema.preferirGruesa !== 'boolean') e.sistema.preferirGruesa = true;
     e.cilindros.forEach(function (c) {
       if (!TIPOS[c.tipo]) c.tipo = Number(c.lados) === 1 ? 'simple' : 'doble';
       if (c.medida == null) c.medida = '';
@@ -584,7 +587,10 @@
     var html = an.ok
       ? '<span class="pildora pildora-ok">Plan cumplido</span>'
       : '<span class="pildora pildora-error">' + plural(an.errores.length, 'error', 'errores') + '</span>';
-    html += '<span class="pildora pildora-oro">' + plural(total, 'pastilla', 'pastillas') + ' en total</span>';
+    estado.sistema.pastillas.slice().sort(function (a, b) { return b.saltos - a.saltos; }).forEach(function (p) {
+      var n = an.material.pastillas[p.saltos] || 0;
+      html += '<span class="pildora pildora-oro">' + n + ' de ' + esc(tieneMm(p) ? mm(p.mm) + ' mm' : p.saltos + ' alturas') + '</span>';
+    });
     html += '<span class="pildora pildora-neutra">Propuesta ' + (estado.semilla || 1) + '</span>';
     r.innerHTML = html;
   }
@@ -837,7 +843,26 @@
         '<div><h3>Pastillas</h3><div class="tabla-scroll"><table class="tabla"><thead><tr><th scope="col">Pastilla</th><th scope="col">Unidades</th></tr></thead><tbody>' + pastillas + '</tbody></table></div>' +
         '<h3 style="margin-top:16px">Pastillas por cilindro</h3><div class="tabla-scroll"><table class="tabla"><thead><tr><th scope="col">Cilindro</th><th scope="col">Medida</th><th scope="col">Pastillas</th></tr></thead><tbody>' + porCil + '</tbody></table></div></div>' +
       '</div>' +
-      '<p class="leyenda">Las cantidades cuentan las dos mitades de los cilindros dobles. Solo incluyen los pitones inferiores y las pastillas; los contrapitones y muelles van como en un cilindro sin amaestrar.</p>';
+      '<p class="leyenda">Las cantidades cuentan las dos mitades de los cilindros dobles. Solo incluyen los pitones inferiores y las pastillas; los contrapitones y muelles van como en un cilindro sin amaestrar.</p>' +
+      consejoFinas(an);
+  }
+
+  /* Explica por qué quedan pastillas finas: posiciones donde la maestra no deja bajar con la gruesa. */
+  function consejoFinas(an) {
+    var s = estado.sistema;
+    if (s.pastillas.length < 2) return '';
+    var gruesa = s.pastillas.reduce(function (a, p) { return p.saltos > a.saltos ? p : a; });
+    var finas = 0;
+    s.pastillas.forEach(function (p) { if (p !== gruesa) finas += an.material.pastillas[p.saltos] || 0; });
+    if (!finas) return '<p class="leyenda">Todas las pastillas son de ' + esc(nombrePastilla(gruesa)) + '.</p>';
+    var M = estado.maestra, sinHueco = [];
+    for (var p = 0; p < s.posiciones; p++) {
+      var profundo = s.profundoAlto !== false ? M[p] + gruesa.saltos <= s.alturas : M[p] - gruesa.saltos >= 1;
+      if (!profundo) sinHueco.push('P' + (p + 1) + ' (' + M[p] + ')');
+    }
+    return '<p class="leyenda consejo">Quedan ' + finas + ' pastillas finas porque, con esta maestra, en ' + sinHueco.join(', ') +
+      ' no cabe un corte ' + gruesa.saltos + ' alturas más hondo, y cada llave necesita algún corte más hondo que la maestra. ' +
+      'Una maestra con cortes superficiales en esas posiciones permite usar más pastillas de ' + esc(nombrePastilla(gruesa)) + '.</p>';
   }
 
   /* ---------- Pestañas ---------- */
@@ -901,6 +926,8 @@
         '</div>' +
         '<label class="opcion"><input type="checkbox" data-sis="antiRebaje"' + (s.antiRebaje !== false ? ' checked' : '') + '>' +
           '<span><b>Antirrebaje</b>: ninguna llave puede convertirse, tallándola más honda, en la maestra ni en otra llave que abra más puertas.</span></label>' +
+        '<label class="opcion"><input type="checkbox" data-sis="preferirGruesa"' + (s.preferirGruesa !== false ? ' checked' : '') + '>' +
+          '<span><b>Pastilla gruesa primero</b>: usa la pastilla que más alturas sube siempre que se pueda y la fina solo cuando no hay otra salida.</span></label>' +
         '<h3 class="sub">Pastillas de amaestramiento</h3>' +
         '<p class="leyenda arriba">Indica cuántas alturas sube cada pastilla que tengas. El grosor en mm es opcional y sale en la hoja y en el documento.</p>' +
         '<div class="tabla-scroll"><table class="tabla tabla-pastillas"><thead><tr><th scope="col">Alturas que sube</th><th scope="col">Grosor (mm)</th><th scope="col"><span class="oculto">Quitar</span></th></tr></thead><tbody>' + past + '</tbody></table></div>' +
@@ -956,6 +983,7 @@
       else if (clave === 'minDifMaestra' || clave === 'minDifLlaves') s[clave] = Math.min(s.posiciones, Math.max(1, n || 1));
       else if (clave === 'profundoAlto') s.profundoAlto = el.value !== 'bajo';
       else if (clave === 'antiRebaje') s.antiRebaje = el.checked;
+      else if (clave === 'preferirGruesa') s.preferirGruesa = el.checked;
       else s[clave] = el.value.trim();
       s.plantilla = 'personalizado';
     } else if (el.hasAttribute('data-prof')) {
