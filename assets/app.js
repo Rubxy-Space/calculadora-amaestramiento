@@ -25,7 +25,9 @@
         stop: '',
         pastillas: [{ mm: null, saltos: 2 }, { mm: null, saltos: 4 }],
         minDifMaestra: 2,
-        minDifLlaves: 2
+        minDifLlaves: 2,
+        profundoAlto: true,
+        antiRebaje: true
       }
     },
     securemmeK1: {
@@ -39,7 +41,9 @@
         stop: 0,
         pastillas: [{ mm: 0.9, saltos: 2 }, { mm: 1.8, saltos: 4 }],
         minDifMaestra: 2,
-        minDifLlaves: 2
+        minDifLlaves: 2,
+        profundoAlto: true,
+        antiRebaje: true
       }
     }
   };
@@ -109,6 +113,8 @@
     ['obra', 'referencia', 'notas'].forEach(function (k) { if (typeof e[k] !== 'string') e[k] = ''; });
     if (e.copiasMaestra == null) e.copiasMaestra = '';
     if (!e.sistema.plantilla) e.sistema.plantilla = 'personalizado';
+    if (typeof e.sistema.profundoAlto !== 'boolean') e.sistema.profundoAlto = true;
+    if (typeof e.sistema.antiRebaje !== 'boolean') e.sistema.antiRebaje = true;
     e.cilindros.forEach(function (c) {
       if (!TIPOS[c.tipo]) c.tipo = Number(c.lados) === 1 ? 'simple' : 'doble';
       if (c.medida == null) c.medida = '';
@@ -152,6 +158,8 @@
     });
   }
   function mm(v) { return Number(v).toFixed(2).replace('.', ','); }
+  /* ¿El corte v es más hondo que el corte m? Depende de cómo numere la marca. */
+  function masHonda(v, m) { return estado.sistema.profundoAlto !== false ? v > m : v < m; }
   function tieneMm(p) { return p.mm != null && p.mm !== '' && Number(p.mm) > 0; }
   function nombrePastilla(p) {
     return tieneMm(p) ? mm(p.mm) + ' mm' : 'de ' + p.saltos + (p.saltos === 1 ? ' altura' : ' alturas');
@@ -236,7 +244,15 @@
       pintarResultado();
       return;
     }
-    var r = Motor.generar(datosMotor(), { semilla: estado.semilla || 1 });
+    mensaje('Calculando…', false);
+    $('#btn-calcular').disabled = true;
+    setTimeout(function () {
+      $('#btn-calcular').disabled = false;
+      aplicarCalculo(Motor.generar(datosMotor(), { semilla: estado.semilla || 1 }));
+    }, 30);
+  }
+
+  function aplicarCalculo(r) {
     if (!r.ok) {
       mensaje(r.motivo, true);
     } else {
@@ -575,7 +591,7 @@
 
   function celdaAltura(v, maestra, H, editable, clave, etiqueta) {
     var ok = Number.isInteger(v) && v >= 1 && v <= H;
-    var clases = 'celda-alt' + (ok && v !== maestra ? ' distinta' : '') + (!ok && editable ? ' invalida' : '');
+    var clases = 'celda-alt' + (ok && v !== maestra ? ' distinta' : '') + (ok && masHonda(v, maestra) ? ' honda' : '') + (!ok && editable ? ' invalida' : '');
     var estilo = 'style="--h:' + (ok ? v : 0) + ';--max:' + H + '"';
     if (!editable) return '<span class="' + clases + '" ' + estilo + '><b>' + (ok ? v : '') + '</b></span>';
     return '<span class="' + clases + '" ' + estilo + '><input inputmode="numeric" autocomplete="off" maxlength="' + String(H).length + '" ' +
@@ -628,7 +644,8 @@
 
     panel.innerHTML = titulo +
       '<div class="tabla-scroll"><table class="tabla tabla-codigos">' + cab + '<tbody>' + filas + '</tbody></table></div>' +
-      '<p class="leyenda"><span class="muestra" aria-hidden="true"></span>Altura distinta de la maestra. Puedes corregir cualquier altura a mano: la llave queda fijada y la comprobación se rehace al momento.' +
+      '<p class="leyenda"><span class="muestra" aria-hidden="true"></span>Altura distinta de la maestra. <span class="muestra-honda" aria-hidden="true"></span>Corte más hondo que la maestra: como no se puede volver atrás, impide sacar la maestra tallando esa llave. Cada llave necesita al menos uno.</p>' +
+      '<p class="leyenda">Puedes corregir cualquier altura a mano: la llave queda fijada y la comprobación se rehace al momento.' +
         (conProf ? ' La columna Profundidades da el valor de la ficha para cada posición.' : '') + '</p>' +
       '<div class="acciones-res no-imprimir"><button type="button" class="boton-sec" id="btn-copiar">Copiar códigos</button>' +
       '<button type="button" class="boton-sec" id="btn-soltar">Soltar todas las llaves fijadas</button></div>';
@@ -668,6 +685,7 @@
       var celda = inp.parentNode;
       celda.classList.toggle('distinta', ok && v !== M[q]);
       celda.classList.toggle('invalida', !ok);
+      celda.classList.toggle('honda', ok && masHonda(v, M[q]));
       celda.style.setProperty('--h', ok ? v : 0);
     });
     var prof = fila.querySelector('.silca');
@@ -736,7 +754,7 @@
 
     var cab = '<thead><tr><th scope="col">Cilindro</th>';
     for (var p = 0; p < P; p++) cab += '<th scope="col" class="col-pos">P' + (p + 1) + '</th>';
-    cab += '<th scope="col">Pastillas</th><th scope="col">Lo abren</th></tr></thead>';
+    cab += '<th scope="col">Pastillas del cilindro</th><th scope="col">Lo abren</th></tr></thead>';
 
     var filas = an.cilindros.map(function (c) {
       var fila = '<tr><th scope="row" class="cil-celda"><b>' + esc(c.id) + '</b><span>' + esc(c.nombre) + '</span><small>' +
@@ -753,7 +771,7 @@
           (cam.pila.length ? ' más pastillas ' + cam.pila.map(nombrePastilla).join(' y ') : ' sin pastillas') + '">' + pila + '</span>' +
           '<span class="cortes">' + (cam.puntos.length > 1 ? 'corta en ' + cam.puntos.join(', ') : 'corta en ' + cam.base) + '</span></td>';
       }
-      fila += '<td class="num">' + c.pastillas + (c.lados === 2 ? ' × 2' : '') + '</td>';
+      fila += '<td class="num">' + (c.lados === 2 ? (c.pastillas * 2) + '<small class="detalle">' + c.pastillas + ' por lado</small>' : c.pastillas) + '</td>';
       fila += '<td class="abre-lista">' + c.autorizadas.map(function (id) { return esc(nombres[id]); }).join(', ') + '</td></tr>';
       return fila;
     }).join('');
@@ -776,6 +794,7 @@
       return '<tr><th scope="row" class="nombre-llave">' + esc(l.nombre) + '</th>' + an.matriz[i].map(function (m, j) {
         var c = an.cilindros[j];
         if (m.autorizada && m.abre) return '<td class="estado estado-ok" title="Abre ' + esc(c.id) + '">✓<span class="oculto"> abre</span></td>';
+        if (m.rebaje) return '<td class="estado estado-mal" title="Tallando más hondo esta llave se saca una que abre ' + esc(c.id) + '">Se saca tallando</td>';
         if (!m.autorizada && !m.abre) return '<td class="estado estado-no" title="No abre ' + esc(c.id) + '">·<span class="oculto"> no abre</span></td>';
         if (!m.autorizada && m.abre) return '<td class="estado estado-mal">Abre de más</td>';
         return '<td class="estado estado-mal">No abre</td>';
@@ -875,7 +894,13 @@
           campo('Alturas por posición', 'alturas', s.alturas, 'numeric') +
           campo('Posiciones distintas con la maestra', 'minDifMaestra', s.minDifMaestra, 'numeric') +
           campo('Posiciones distintas entre llaves', 'minDifLlaves', s.minDifLlaves, 'numeric') +
+          '<div class="campo"><label for="s-profundoAlto">Corte más hondo</label><select id="s-profundoAlto" data-foco="s-profundoAlto" data-sis="profundoAlto">' +
+            '<option value="alto"' + (s.profundoAlto !== false ? ' selected' : '') + '>El número más alto (' + s.alturas + ')</option>' +
+            '<option value="bajo"' + (s.profundoAlto === false ? ' selected' : '') + '>El número más bajo (1)</option>' +
+          '</select></div>' +
         '</div>' +
+        '<label class="opcion"><input type="checkbox" data-sis="antiRebaje"' + (s.antiRebaje !== false ? ' checked' : '') + '>' +
+          '<span><b>Antirrebaje</b>: ninguna llave puede convertirse, tallándola más honda, en la maestra ni en otra llave que abra más puertas.</span></label>' +
         '<h3 class="sub">Pastillas de amaestramiento</h3>' +
         '<p class="leyenda arriba">Indica cuántas alturas sube cada pastilla que tengas. El grosor en mm es opcional y sale en la hoja y en el documento.</p>' +
         '<div class="tabla-scroll"><table class="tabla tabla-pastillas"><thead><tr><th scope="col">Alturas que sube</th><th scope="col">Grosor (mm)</th><th scope="col"><span class="oculto">Quitar</span></th></tr></thead><tbody>' + past + '</tbody></table></div>' +
@@ -929,6 +954,8 @@
       else if (clave === 'posiciones') ajustarTamanos(Math.min(10, Math.max(2, n || s.posiciones)), s.alturas);
       else if (clave === 'alturas') ajustarTamanos(s.posiciones, Math.min(12, Math.max(2, n || s.alturas)));
       else if (clave === 'minDifMaestra' || clave === 'minDifLlaves') s[clave] = Math.min(s.posiciones, Math.max(1, n || 1));
+      else if (clave === 'profundoAlto') s.profundoAlto = el.value !== 'bajo';
+      else if (clave === 'antiRebaje') s.antiRebaje = el.checked;
       else s[clave] = el.value.trim();
       s.plantilla = 'personalizado';
     } else if (el.hasAttribute('data-prof')) {
@@ -1021,6 +1048,7 @@
     '.mono{font-family:Menlo,Consolas,monospace}',
     '.dif{background:#f1e5c4;font-weight:700;border-radius:4px}',
     '.alt{display:inline-block;min-width:22px;padding:2px 4px;text-align:center;font:700 13px Menlo,Consolas,monospace}',
+    '.alt.honda{box-shadow:inset 0 -3px 0 #0c0c0c}',
     '.si{color:#2e7a4b;font-weight:700}',
     '.no{color:#b9b3a5}',
     '.mal{color:#b42318;font-weight:700;background:#fdecea}',
@@ -1080,7 +1108,7 @@
       var celdas = '';
       for (var q = 0; q < P; q++) {
         var x = cod && cod[q];
-        celdas += '<td class="c"><span class="alt' + (!esM && x && x !== M[q] ? ' dif' : '') + '">' + (x || '?') + '</span></td>';
+        celdas += '<td class="c"><span class="alt' + (!esM && x && x !== M[q] ? ' dif' : '') + (!esM && x && masHonda(x, M[q]) ? ' honda' : '') + '">' + (x || '?') + '</span></td>';
       }
       return '<tr><td><b>' + esc(nombre) + '</b></td>' + celdas +
         (conProf ? '<td class="mono">' + (cod ? textoSilca(cod) : '') + '</td>' : '') +
@@ -1103,7 +1131,7 @@
             return '<span class="pas"' + (pa.saltos > saltoMin ? ' style="background:#d7c278;padding-top:3px;padding-bottom:3px"' : '') + '>' + (tieneMm(pa) ? mm(pa.mm) : '+' + pa.saltos) + '</span>';
           }).join('') + '</span></td>';
         }
-        return '<tr><td><b class="mono">' + esc(c.id) + '</b> ' + esc(c.nombre) + '</td>' + celdas + '<td class="c">' + (c.pastillas * c.lados) + '</td></tr>';
+        return '<tr><td><b class="mono">' + esc(c.id) + '</b> ' + esc(c.nombre) + '</td>' + celdas + '<td class="c">' + (c.pastillas * c.lados) + (c.lados === 2 ? '<br><small style="color:#7a7465">' + c.pastillas + ' por lado</small>' : '') + '</td></tr>';
       }).join('');
 
       var pit = '';
@@ -1144,8 +1172,8 @@
       '<div class="bloque"><h2>Cilindros</h2><div class="tabla-scroll"><table><thead><tr><th>Código</th><th>Puerta</th><th>Medida</th><th>Tipo</th></tr></thead><tbody>' + filasCil + '</tbody></table></div></div>' +
       '<div class="bloque"><h2>Plan de cierre</h2><div class="tabla-scroll"><table><thead><tr><th>Llave</th><th class="c">Copias</th>' + cabCil + '</tr></thead><tbody>' + filasPlan + '</tbody></table></div></div>' +
       '<div class="bloque"><h2>Códigos de tallado</h2><div class="tabla-scroll"><table><thead><tr><th>Llave</th>' + cabPos + (conProf ? '<th>Profundidades</th>' : '') + '<th>Abre</th></tr></thead><tbody>' + filasCod + '</tbody></table></div>' +
-        '<p class="meta" style="margin-top:6px;font-size:11.5px"><span class="alt dif">3</span> altura distinta de la maestra</p></div>' +
-      (conCodigos ? '<div class="bloque"><h2>Montaje de cilindros</h2><div class="tabla-scroll"><table><thead><tr><th>Cilindro</th>' + cabPos + '<th class="c">Pastillas</th></tr></thead><tbody>' + filasMont + '</tbody></table></div>' +
+        '<p class="meta" style="margin-top:6px;font-size:11.5px"><span class="alt dif">3</span> altura distinta de la maestra · <span class="alt dif honda">5</span> corte más hondo que la maestra (impide sacar la maestra tallando)</p></div>' +
+      (conCodigos ? '<div class="bloque"><h2>Montaje de cilindros</h2><div class="tabla-scroll"><table><thead><tr><th>Cilindro</th>' + cabPos + '<th class="c">Pastillas del cilindro</th></tr></thead><tbody>' + filasMont + '</tbody></table></div>' +
         '<p class="meta" style="margin-top:6px;font-size:11.5px">Cada cámara se lee de abajo arriba: pitón (negro) contra la llave y pastillas (oro) encima. En los cilindros dobles las dos mitades se montan igual.</p></div>' +
         '<div class="bloque"><h2>Material</h2>' + material + '</div>' +
         '<div class="bloque"><h2>Comprobación</h2>' + estadoHtml + '</div>' : '') +
